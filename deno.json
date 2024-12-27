@@ -1,0 +1,13 @@
+{
+  "imports": {
+    "rdb": "./mod.ts"
+  },
+  "compilerOptions": {
+    "noImplicitAny": false
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-explicit-any"]
+    }
+  }
+}
