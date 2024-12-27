@@ -1,2 +1,4 @@
 dist/*
 !dist/.keep
+
+dev_log.txt
