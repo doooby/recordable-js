@@ -12,9 +12,9 @@ export interface RecordReaderState<R extends rdb.Object> {
   error?: Error
 }
 
-export interface RecordReaderOptions<R> {
+export interface RecordReaderOptions<R extends rdb.Object> {
   resourcePath?: string
-  headerMapper?: () => R
+  headerMapper?: () => rdb.Object
   payloadMapper?: () => R
 }
 
@@ -30,7 +30,7 @@ export class RecordReader<R extends rdb.Object> {
   ) => void> = undefined
 
   resourcePath: rdb.Maybe<string> = undefined
-  headerMapper: rdb.Maybe<() => R> = undefined
+  headerMapper: rdb.Maybe<() => rdb.Object> = undefined
   payloadMapper: rdb.Maybe<() => R> = undefined
 
   constructor (options: RecordReaderOptions<R>) {
