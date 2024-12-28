@@ -12,6 +12,12 @@ export interface RecordReaderState<R extends rdb.Object> {
   error?: Error
 }
 
+export interface RecordReaderOptions<R> {
+  resourcePath?: string
+  headerMapper?: () => R
+  payloadMapper?: () => R
+}
+
 export class RecordReader<R extends rdb.Object> {
 
   state: RecordReaderState<R> = {
@@ -27,18 +33,10 @@ export class RecordReader<R extends rdb.Object> {
   headerMapper: rdb.Maybe<() => R> = undefined
   payloadMapper: rdb.Maybe<() => R> = undefined
 
-  constructor ({
-    resourcePath,
-    headerMapper,
-    payloadMapper,
-  }: {
-    resourcePath?: string
-    headerMapper?: () => R
-    payloadMapper?: () => R
-  }) {
-    this.resourcePath = resourcePath
-    this.headerMapper = headerMapper
-    this.payloadMapper = payloadMapper
+  constructor (options: RecordReaderOptions<R>) {
+    this.resourcePath = options.resourcePath
+    this.headerMapper = options.headerMapper
+    this.payloadMapper = options.payloadMapper
   }
 
   async fetch (): Promise<rdb.Anything> {
@@ -122,6 +120,40 @@ export class RecordReader<R extends rdb.Object> {
 
 }
 
+export interface FetchJsonRecordReaderOptions<R> {
+  baseUrlPath?: string
+  body?: string
+  cookie?: string
+}
+
 export class FetchJsonRecordReader<R extends rdb.Object> extends RecordReader<R> {
 
+  static fetch = globalThis.fetch
+
+  baseUrlPath: rdb.Maybe<string> = undefined
+  body: rdb.Maybe<string> = undefined
+  cookie: rdb.Maybe<string> = undefined
+
+  constructor (options : RecordReaderOptions<R> & FetchJsonRecordReaderOptions<R> ) {
+    super(options)
+    this.baseUrlPath = options.baseUrlPath
+    this.body = options.body
+    this.cookie = options.cookie
+  }
+
+  override async fetch (): Promise<rdb.Anything> {
+    const rawResponse = await FetchJsonRecordReader.fetch(
+      `${this.baseUrlPath}${this.resourcePath}`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: this.cookie?.length ? this.cookie : '',
+        },
+        body: this.body ?? '',
+      },
+    )
+    return await rawResponse.json()
+  }
 }
