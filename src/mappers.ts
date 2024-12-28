@@ -1,23 +1,23 @@
-import rdb from 'rdb';
+import rdb from 'rdb'
 
 export class RdbTypeError extends Error {
-  readonly __RdbTypeError = true;
-  private readonly propertyTraces: [ number | string, rdb.Anything ][] = [];
-  context?: unknown;
+  readonly __RdbTypeError = true
+  private readonly propertyTraces: [ number | string, rdb.Anything ][] = []
+  context: rdb.Maybe<rdb.SparseList<rdb.Anything>> = undefined
 
   constructor (private readonly source: string) {
-    super('rdb type error');
+    super('rdb type error')
   }
 
-  addPropertyTrace (name: number | string, parent: rdb.Object) {
-    this.propertyTraces.push([ name, parent ]);
+  addPropertyTrace (name: number | string, record: rdb.Object) {
+    this.propertyTraces.push([ name, record ])
   }
 
   seal (context: unknown) {
-    const props = this.propertyTraces.map(([ prop ]) => prop);
-    props.reverse();
-    this.message = `${this.message}: ${this.source} at .${props.join('.')}`;
-    this.context = context;
+    const props = this.propertyTraces.map(([ prop ]) => prop)
+    props.reverse()
+    this.message = `${this.message}: ${this.source} at .${props.join('.')}`
+    this.context = [ context ]
   }
 }
 
@@ -25,23 +25,23 @@ export class RdbTypeError extends Error {
 
 export function integer (value: rdb.Anything): number {
   if (typeof value !== 'number' || !Number.isInteger(value)) {
-    throw new rdb.RdbTypeError('not integer');
+    throw new rdb.RdbTypeError('not integer')
   }
-  return value;
+  return value
 }
 
 export function string (value: rdb.Anything): string {
   if (typeof value !== 'string') {
-    throw new rdb.RdbTypeError('not string');
+    throw new rdb.RdbTypeError('not string')
   }
-  return value;
+  return value
 }
 
 export function boolean (value: rdb.Anything): boolean {
   if (typeof value !== 'boolean') {
-    throw new rdb.RdbTypeError('not boolean');
+    throw new rdb.RdbTypeError('not boolean')
   }
-  return value;
+  return value
 }
 
 // COMPOSITES
@@ -51,25 +51,25 @@ export function optional<V> (
 ): (value: rdb.Anything) => rdb.Maybe<V>  {
   return (value) => {
     if (rdb.helpers.isEmpty(value)) {
-      return undefined;
+      return undefined
     } else {
-      return mapper(value);
+      return mapper(value)
     }
-  };
+  }
 }
 
 export function property<V> (
-  parent: rdb.Object,
+  record: rdb.Object,
   name: number | string,
   mapper: (value: rdb.Anything) => V,
 ): V {
   try {
-    return mapper(parent[name]);
+    return mapper(record[name])
   } catch (error) {
     if (error instanceof rdb.RdbTypeError) {
-      error.addPropertyTrace(name, parent);
+      error.addPropertyTrace(name, record)
     }
-    throw error;
+    throw error
   }
 }
 
@@ -78,10 +78,10 @@ export function record<T> (
 ): (value: rdb.Anything) => T {
   return (value) => {
     if (!rdb.helpers.isObject(value)) {
-      throw new rdb.RdbTypeError('not object');
+      throw new rdb.RdbTypeError('not object')
     }
-    return mapper(value);
-  };
+    return mapper(value)
+  }
 }
 
 export function list<V> (
@@ -89,14 +89,14 @@ export function list<V> (
 ): (value: rdb.Anything) => rdb.List<V> {
   return (value) => {
     if (!rdb.helpers.isArray(value)) {
-      throw new rdb.RdbTypeError('not array');
+      throw new rdb.RdbTypeError('not array')
     }
-    const array: rdb.List<V> = [];
+    const array: rdb.List<V> = []
     for (let i = 0; i < value.length; i += 1) {
-      array[i] = rdb.property(value, i, mapper);
+      array[i] = rdb.property(value, i, mapper)
     }
-    return array;
-  };
+    return array
+  }
 }
 
 export function sparseList<V> (
@@ -111,13 +111,13 @@ export function tuple<V0, V1> (
 ): (value: rdb.Anything) => [V0, V1] {
   return (value) => {
     if (!Array.isArray(value)) {
-      throw new rdb.RdbTypeError('not array');
+      throw new rdb.RdbTypeError('not array')
     }
     if (!rdb.helpers.isArray(value)) {
-      throw new rdb.RdbTypeError('not array');
+      throw new rdb.RdbTypeError('not array')
     }
-    const item0 = rdb.property(value, 0, mapper0);
-    const item1 = rdb.property(value, 1, mapper1);
-    return [ item0, item1 ];
-  };
+    const item0 = rdb.property(value, 0, mapper0)
+    const item1 = rdb.property(value, 1, mapper1)
+    return [ item0, item1 ]
+  }
 }
