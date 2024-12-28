@@ -2,6 +2,11 @@ import rdb from 'rdb'
 
 export interface RecordReaderState<R extends rdb.Object> {
   processing: boolean
+  envelope?: {
+      header: rdb.Maybe<rdb.Object>
+      payload: rdb.Maybe<rdb.Object>
+      failReason: rdb.Maybe<string>
+  }
   record?: R
   failReason?: string
   error?: Error
@@ -19,17 +24,21 @@ export class RecordReader<R extends rdb.Object> {
   ) => void> = undefined
 
   resourcePath: rdb.Maybe<string> = undefined
-  mapper: rdb.Maybe<() => R> = undefined
+  headerMapper: rdb.Maybe<() => R> = undefined
+  payloadMapper: rdb.Maybe<() => R> = undefined
 
   constructor ({
     resourcePath,
-    mapper,
+    headerMapper,
+    payloadMapper,
   }: {
-    resourcePath?: string,
-    mapper?: () => R,
+    resourcePath?: string
+    headerMapper?: () => R
+    payloadMapper?: () => R
   }) {
     this.resourcePath = resourcePath
-    this.mapper = mapper
+    this.headerMapper = headerMapper
+    this.payloadMapper = payloadMapper
   }
 
   async fetch (): Promise<rdb.Anything> {
@@ -49,26 +58,35 @@ export class RecordReader<R extends rdb.Object> {
     }
 
     const envelope = rdb.helpers.tryMap(data, rdb.record((value) => ({
-      header: rdb.property(value, 'header', rdb.optional(rdb.record(value => value))),
+      header: rdb.property(value, 'header', rdb.optional(rdb.record(
+        this.headerMapper || (value => value)
+      ))),
       payload: rdb.property(value, 'payload', rdb.optional(rdb.record(value => value))),
       failReason: rdb.property(value, 'failReason', rdb.optional(rdb.string)),
     })))
 
     if (envelope.error) {
-      this.finalizeReadOnError(envelope.error, 'rdb.fetch_invalid')
+      this.finalizeReadOnError(envelope.error, 'rdb.envelope_invalid')
       return
     }
 
-    if (!this.mapper) {
-      const error = new rdb.helpers.ErrorWithContext('rdb: missing mapper')
+    if (envelope.value.failReason) {
+      const error = new rdb.helpers.ErrorWithContext('rdb: envelope fail')
+      error.context = [ this ]
+      this.finalizeReadOnError(error, 'rdb.envelope_fail', envelope.value)
+      return
+    }
+
+    if (!this.payloadMapper) {
+      const error = new rdb.helpers.ErrorWithContext('rdb: missing payload mapper')
       error.context = [ this ]
       this.finalizeReadOnError(error, 'rdb.missing_mapper')
       return
     }
 
-    const record = rdb.helpers.tryMap(envelope.value, this.mapper)
+    const record = rdb.helpers.tryMap(envelope.value.payload, this.payloadMapper)
     if (record.error) {
-      this.finalizeReadOnError(record.error, 'rdb.mapping_failed')
+      this.finalizeReadOnError(record.error, 'rdb.payload_invalid')
     } else {
       this._setState({
         processing: false,
@@ -83,11 +101,16 @@ export class RecordReader<R extends rdb.Object> {
     this.onChange?.(newState, previousState)
   }
 
-  finalizeReadOnError (error: rdb.Anything, reason: string) {
+  finalizeReadOnError (
+    error: rdb.Anything,
+    failReason: string,
+    envelope?: RecordReaderState<R>['envelope']
+  ) {
     rdb.helpers.logError(error)
     const newState: RecordReaderState<R> = {
+      envelope,
       processing: false,
-      failReason: reason,
+      failReason,
     }
     if (error instanceof Error) {
       newState.error = error
@@ -96,5 +119,9 @@ export class RecordReader<R extends rdb.Object> {
     }
     this._setState(newState)
   }
+
+}
+
+export class FetchJsonRecordReader<R extends rdb.Object> extends RecordReader<R> {
 
 }
