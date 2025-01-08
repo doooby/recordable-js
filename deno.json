@@ -1,5 +1,5 @@
 {
   "imports": {
-    "rdb": "./mod.ts"
+    "@rdb": "./mod.ts"
   }
 }

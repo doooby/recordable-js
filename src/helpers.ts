@@ -1,4 +1,4 @@
-import rdb from 'rdb'
+import rdb from '@rdb'
 
 export function isPresent (value: rdb.Anything): boolean {
   return !isEmpty(value)

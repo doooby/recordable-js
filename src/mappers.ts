@@ -1,4 +1,4 @@
-import rdb from 'rdb'
+import rdb from '@rdb'
 
 export class RdbTypeError extends Error {
   readonly __RdbTypeError = true
@@ -44,20 +44,6 @@ export function boolean (value: rdb.Anything): boolean {
   return value
 }
 
-// COMPOSITES
-
-export function optional<V> (
-  mapper: (value: rdb.Anything) => V
-): (value: rdb.Anything) => rdb.Maybe<V>  {
-  return (value) => {
-    if (rdb.helpers.isEmpty(value)) {
-      return undefined
-    } else {
-      return mapper(value)
-    }
-  }
-}
-
 export function property<V> (
   record: rdb.Object,
   name: number | string,
@@ -70,6 +56,22 @@ export function property<V> (
       error.addPropertyTrace(name, record)
     }
     throw error
+  }
+}
+
+export const dig = property
+
+// COMPOSITES
+
+export function optional<V> (
+  mapper: (value: rdb.Anything) => V
+): (value: rdb.Anything) => rdb.Maybe<V>  {
+  return (value) => {
+    if (rdb.helpers.isEmpty(value)) {
+      return undefined
+    } else {
+      return mapper(value)
+    }
   }
 }
 

@@ -14,5 +14,16 @@
     "@std/internal@1.0.5": {
       "integrity": "54a546004f769c1ac9e025abd15a76b6671ddc9687e2313b67376125650dc7ba"
     }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@rollup/plugin-alias@^5.1.1",
+        "npm:esbuild@~0.24.2",
+        "npm:rollup-plugin-typescript2@0.36",
+        "npm:rollup@^4.30.0",
+        "npm:tslib@^2.8.1"
+      ]
+    }
   }
 }

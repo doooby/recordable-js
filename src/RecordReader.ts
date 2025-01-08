@@ -1,4 +1,4 @@
-import rdb from 'rdb'
+import rdb from '@rdb'
 
 export interface RecordReaderState<R extends rdb.Object> {
   processing: boolean
