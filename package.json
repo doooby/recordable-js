@@ -7,7 +7,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "rollup --config"
+    "build": "rollup -c"
   },
   "devDependencies": {
     "@rollup/plugin-alias": "^5.1.1",
