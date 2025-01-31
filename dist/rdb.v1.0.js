@@ -1,3 +1,10 @@
+
+/**
+ * RELEASE rdb.v1.0.js
+ * Recordable.js
+ * https://raw.githubusercontent.com/doooby/recordable-js/refs/heads/main/dist/rdb.v1.0.js
+ */
+
 /**
  * @typedef {any} SomeValue
  * @typedef {function(SomeValue): SomeValue} MapperFunction
@@ -223,8 +230,6 @@ class RecordReader {
 
 class FetchJsonRecordReader extends RecordReader {
 
-  static fetch = globalThis.fetch
-
   baseUrlPath = undefined
   body = undefined
   cookie = undefined
@@ -237,7 +242,7 @@ class FetchJsonRecordReader extends RecordReader {
   }
 
   async fetch () {
-    const rawResponse = await FetchJsonRecordReader.fetch(
+    const rawResponse = await fetch(
       `${this.baseUrlPath}${this.resourcePath}`,
       {
         method: 'POST',
@@ -292,22 +297,22 @@ const rdb = {
     return value
   },
 
-    /**
-   * @param {SomeValue} record
-   * @param {number|string} name
-   * @param {MapperFunction} mapper
-   * @returns {SomeValue}
-   */
-    property (record, name, mapper) {
-      try {
-        return mapper(record[name])
-      } catch (error) {
-        if (rdb.helpers.isRdbTypeError(error)) {
-          error.addPropertyTrace(name, record)
-        }
-        throw error
+    /*
+  * @param {SomeValue} record
+  * @param {number|string} name
+  * @param {MapperFunction} mapper
+  * @returns {SomeValue}
+  */
+  property (record, name, mapper) {
+    try {
+      return mapper(record[name])
+    } catch (error) {
+      if (rdb.helpers.isRdbTypeError(error)) {
+        error.addPropertyTrace(name, record)
       }
-    },
+      throw error
+    }
+  },
 
   /**
    * @param {SomeValue} record
@@ -316,7 +321,7 @@ const rdb = {
    * @returns {SomeValue}
    */
   dig (record, name, mapper) {
-    helpers.property(record, name, mapper)
+    return rdb.property(record, name, mapper)
   },
 
   /**
@@ -368,7 +373,7 @@ const rdb = {
    * @returns {MapperFunction}
    */
   sparseList (mapper) {
-    return list(value => optional(mapper)(value))
+    return rdb.list(value => rdb.optional(mapper)(value))
   },
 
   /**
