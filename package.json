@@ -2,12 +2,12 @@
   "name": "rdb.js",
   "version": "1.0.0",
   "description": "Recordable.js",
-  "main": "dist/rdb.esm.js",
+  "main": "dist/rdb.v1.js",
   "author": "github/doooby",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "rollup --config"
+    "build": "rollup -c"
   },
   "devDependencies": {
     "@rollup/plugin-alias": "^5.1.1",

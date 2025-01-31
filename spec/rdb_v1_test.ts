@@ -1,4 +1,4 @@
-import rdb from '../dist/rdb.v0.js'
+import rdb from '../dist/rdb.v1.js'
 import * as t from 'jsr:@std/assert'
 
 Deno.test('maps optional string', () => {
