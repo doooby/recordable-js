@@ -9,8 +9,6 @@ Ensures that your data has specific structure. Gives sensible error messages oth
 ## current status
 `v.1.0 ` released with minimal docs.
 
-For more detail please refer to [tasks & TODOs](TASKS.md).
-
 The simple reason for lack of docs is that while this lib is perfectly usable and functional in it's current shape, the project that uses this is still in early development.
 
 ### TS
