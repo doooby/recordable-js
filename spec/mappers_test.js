@@ -1,4 +1,4 @@
-import rdb from '../dist/rdb.v1.1.js'
+import { rdb, globals } from './test_helper.js'
 import * as t from 'jsr:@std/assert'
 
 Deno.test('maps optional string', () => {
@@ -10,7 +10,7 @@ Deno.test('throws rdb type error', () => {
   t.assertThrows(
     () => { rdb.string(null) },
     rdb.RdbTypeError,
-    'rdb type error'
+    'rdb.type'
   )
 })
 
@@ -24,7 +24,7 @@ Deno.test('throws record mapping error', () => {
   t.assertIsError(
     result.error,
     rdb.RdbTypeError,
-    'rdb type error: not integer at .number'
+    'rdb.type : not integer at .number'
   )
 })
 

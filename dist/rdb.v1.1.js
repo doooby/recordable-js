@@ -8,15 +8,15 @@
  * @typedef {any} SomeValue
  * @typedef {function(SomeValue): SomeValue} MapperFunction
 *
-* @typedef {Object} RecordReaderState
+* @typedef {Object} RecordState
 * @property {boolean} processing
+* @property {string} [failReason]
 * @property {Object} [envelope]
+* @property {SomeValue} [envelope.failReason]
 * @property {SomeValue} [envelope.header]
 * @property {SomeValue} [envelope.payload]
-* @property {SomeValue} [envelope.failReason]
+* @property {SomeValue} [header]
 * @property {SomeValue} [record]
-* @property {string} [failReason]
-* @property {Error} [error]
 *
 */
 
@@ -104,16 +104,15 @@ const helpers = {
     }
   },
 
-  logError (error) {
-    console.error(error)
-    if (rdb.helpers.isObject(error) && error.context) {
-      console.log(error.context)
+  logError (error, context) {
+    console.error(error || 'rdb.unknown_error')
+    if (context || error?.context) {
+      console.log('rdb.error_context:', {
+        ...context,
+        ...error?.context,
+      })
     }
   },
-
-  ErrorWithContext: class ErrorWithContext extends Error {
-    context = undefined
-  }
 }
 
 class RdbTypeError extends Error {
@@ -123,7 +122,7 @@ class RdbTypeError extends Error {
   context = undefined
 
   constructor (source) {
-    super('rdb type error')
+    super('rdb.type')
     this.source = source
   }
 
@@ -131,17 +130,17 @@ class RdbTypeError extends Error {
     this.propertyTraces.push([ name, record ])
   }
 
-  seal (context) {
+  seal (data) {
     const props = this.propertyTraces.map(([ prop ]) => prop)
     props.reverse()
-    this.message = `${this.message}: ${this.source} at .${props.join('.')}`
-    this.context = [ context ]
+    this.message = `${this.message} : ${this.source} at .${props.join('.')}`
+    this.context = { data }
   }
 }
 
 class Fetch {
   constructor (method, url, params, transform) {
-    this.method = method || 'GET'
+    this.method = method ? method.toUpperCase() : 'GET'
     this.url = url instanceof URL ? url : new URL(url, location.origin)
     this._headers = undefined
     this._formData = undefined
@@ -195,7 +194,7 @@ class Fetch {
   }
 
   isGet () {
-    return this.method.toUpperCase() === 'GET'
+    return this.method === 'GET'
 
   }
 
@@ -210,14 +209,14 @@ class Fetch {
       Fetch.appendParamsToFormData(this.formData, this.params)
     }
 
-    const body = isGet ? undefined : ( this._requestBody || this._formData )
-
     const buildOptions = {
       method: this.method,
       credentials: (this.includeCredentials ? 'include' : undefined),
       headers: this.headers,
-      body,
     }
+    
+    const body = isGet ? undefined : ( this._requestBody || this._formData )
+    if (body) buildOptions.body = body
 
     let response = undefined
     try {
@@ -228,18 +227,13 @@ class Fetch {
           : await response.text()
         return [ true, result ]
       } else {
-        Fetch.logFail(undefined, response, this)
+        rdb.helpers.logError(new Error('rdb.fetch_failed'), { response, fetch: this })
         return [ false, undefined ]
       }
     } catch (error) {
-      Fetch.logFail(error, response, this)
+      rdb.helpers.logError(error, { response, fetch: this })
       return [ false, undefined ]
     }
-  }
-
-  static logFail (error, response, client) {
-    console.log(response, client)
-    if (error) console.error(error)
   }
 
   static appendFormDataToUrl (url, formData) {
@@ -296,7 +290,7 @@ class Fetch {
   }
 }
 
-class RecordReader {
+class Record {
   state = {
     processing: false,
   }
@@ -313,73 +307,73 @@ class RecordReader {
   }) {
     this.client = new Fetch(method, url, params)
     this.client.includeCredentials = includeCredentials
-    this,client.setHeader('Content-Type', 'application/json')
+    this.client.setHeader('Content-Type', 'application/json')
     if (!this.client.isGet()) {
-      this,client.transformRequestBody = () =>  {
+      this.client.transformRequestBody = () =>  {
         return this.client.params
           ? JSON.stringify(this.client.params)
           : undefined
       }
     }
+    this.client.transformResult = (result) => this._processResponse(result)
     this.headerMapper = headerMapper
     this.payloadMapper = payloadMapper
     this.onChange = onChange
   }
 
-  async read () {
+  get value () {
+    return this.state.record
+  }
+
+  async fetch () {
     if (this.state.processing) return
     this._setState({ processing: true })
 
-    let data = undefined
-    try {
-      const [ ok, result ] = await this.client.process()
-      if (!ok) {
-        this.finalizeReadOnError(undefined, 'rdb.fetch_failed')
-        return
-      } else {
-        data = result
-      }
-    } catch (error) {
-      this.finalizeReadOnError(error, 'rdb.fetch_failed')
-      return
-    }
-
-    const envelope = rdb.helpers.tryMap(data, rdb.record((value) => ({
-      header: rdb.property(value, 'header', rdb.optional(rdb.record(
-        this.headerMapper || (value => value)
-      ))),
-      payload: rdb.property(value, 'payload', rdb.optional(rdb.record(value => value))),
-      failReason: rdb.property(value, 'failReason', rdb.optional(rdb.string)),
-    })))
-
-    if (envelope.error) {
-      this.finalizeReadOnError(envelope.error, 'rdb.envelope_invalid')
-      return
-    }
-
-    if (envelope.value.failReason) {
-      const error = new rdb.helpers.ErrorWithContext('rdb: envelope fail')
-      error.context = [ this ]
-      this.finalizeReadOnError(error, 'rdb.envelope_fail', envelope.value)
-      return
-    }
-
-    if (!this.payloadMapper) {
-      const error = new rdb.helpers.ErrorWithContext('rdb: missing payload mapper')
-      error.context = [ this ]
-      this.finalizeReadOnError(error, 'rdb.missing_mapper')
-      return
-    }
-
-    const record = rdb.helpers.tryMap(envelope.value.payload, this.payloadMapper)
-    if (record.error) {
-      this.finalizeReadOnError(record.error, 'rdb.payload_invalid')
-    } else {
+    const [ envelopeOk, envelope ] = await this.client.process()
+    if (!envelopeOk) {
       this._setState({
         processing: false,
-        record: record.value,
+        failReason: 'rdb.invalid_data',
       })
+      return
     }
+
+    if (envelope.failReason) {
+      this._setState({
+        processing: false,
+        failReason: 'rdb.envelope_fail',
+        envelope,
+      })
+      return
+    }
+
+    const payloadMapper = this.payloadMapper
+    if (!payloadMapper) {
+      this._setState({
+        processing: false,
+        envelope,
+      })
+      return
+    }
+
+    const { error, value } = rdb.helpers.tryMap(envelope.payload, payloadMapper)
+    if (error) {
+      rdb.helpers.logError(error, { envelope })
+      this._setState({
+        processing: false,
+        failReason: 'rdb.payload_invalid',
+        envelope,
+      })
+      return
+    }
+
+    const state = {
+      processing: false,
+      record: value,
+    }
+    if (envelope.header) state.header = envelope.header
+    this._setState(state)
+    return value
   }
 
   _setState (newState) {
@@ -388,28 +382,34 @@ class RecordReader {
     this.onChange?.(newState, previousState)
   }
 
-  finalizeReadOnError (error, failReason, envelope) {
-    rdb.helpers.logError(error)
-    const newState = {
-      processing: false,
-      envelope,
-      failReason,
-    }
-    if (error instanceof Error) {
-      newState.error = error
-    } else {
-      newState.error = new Error('rdb: unsuported type of error')
-    }
-    this._setState(newState)
+  _fail (reason, envelope) {
+    const state = { processing: false, failReason: reason }
+    if (envelope) state.envelope = envelope
+    this._setState(state)
   }
 
+  async _processResponse (response) {
+    const json = await response.json()
+    const identity = value => value
+    return rdb.helpers.map(json,  rdb.record(value => ({
+      header: rdb.property(value, 'header',
+        rdb.optional(rdb.record(this.headerMapper || identity))
+      ),
+      payload: rdb.property(value, 'payload',
+        rdb.optional(rdb.record(identity))
+      ),
+      failReason: rdb.property(value, 'failReason',
+        rdb.optional(rdb.string)
+      ),
+    })))
+  }
 }
 
 const rdb = {
   helpers,
   RdbTypeError,
   Fetch,
-  RecordReader,
+  Record,
 
   /**
    * @param {SomeValue} value
