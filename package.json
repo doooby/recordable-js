@@ -1,19 +1,8 @@
 {
   "name": "rdb.js",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Recordable.js",
-  "main": "dist/rdb.v1.js",
+  "main": "dist/rdb.v1.1.js",
   "author": "github/doooby",
-  "license": "MIT",
-  "type": "module",
-  "scripts": {
-    "build": "rollup -c"
-  },
-  "devDependencies": {
-    "@rollup/plugin-alias": "^5.1.1",
-    "esbuild": "^0.24.2",
-    "rollup": "^4.30.0",
-    "rollup-plugin-typescript2": "^0.36.0",
-    "tslib": "^2.8.1"
-  }
+  "license": "MIT"
 }

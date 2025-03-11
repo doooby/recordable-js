@@ -3,5 +3,6 @@ node_modules
 dist/*
 !dist/.keep
 !dist/rdb.v1.0.js
+!dist/rdb.v1.1.js
 
 dev_log.txt
