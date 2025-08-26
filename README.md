@@ -1,10 +1,13 @@
 # recordable-js
 rdb.js
 
-Ensures that your data has specific structure. Gives sensible error messages otherwise.
+Ensure your data types are what is declared. If there is a missmatch, sensible tracing error messages are produced.
 
 ## Is it any good?
-[yes](https://news.ycombinator.com/item?id=3067434)
+- [yes](https://news.ycombinator.com/item?id=3067434)
+- ensures data typing with sensible errors
+- API client (minimal wraper arround native fetch)
+- opinionated REST API client (json, metadata, HTML form data, custom params data)
 
 ## current status
 `v.1.1 ` released with minimal docs.
@@ -36,17 +39,35 @@ export function mapTask (value) {
   }))(value)
 }
 
+// use helpers
+const task = rdb.helpers.map(mapTask(null)) // throws the sealed error
+const { error, value } = rdb.helpers.tryMap(mapTask(null))
+
+// or seal the error yourself
+try {
+  mapTask(null)
+} catch (error) {
+  if (rdb.helpers.isRdbTypeError(error)) error.seal(value)
+  console.log(error.message, error.context)
+}
+
+// hits the server with path "/summary.html?search=a&page=2"
+// say there is a from with `<input name="search" value="a" />`
 const [ ok, data ] = await rdb.Fetch.get({
   url: 'http://localhost:3000/summary.html',
-  formData: new FormData(form), // say there is <input name="search" value="a" />
+  formData: new FormData(form), 
   params: { page: 2 },
 })
-// hits the server with path "/summary.html?search=a&page=2"
 
-const client = new rdb.Fetch('delete', '/book/1')
-client.setHeader('Content-Type', 'whatever')
-const [ ok, data ] = await client.process()
+// hits server with DELETE method at "/book/1"
+const request = new rdb.Fetch('delete', '/book/1')
+// OOP based approach to set up the request
+request.setHeader('Content-Type', 'whatever')
+const [ ok, data ] = await request.process()
 
+// helpers that mimic native "fetch"
+// hides common settings, here content-type header
+// transforms and assert the answer; otherwise `ok = false`
 const [ ok, data ] = await rdb.Fetch.postJson({
   url: new URL('book/2', window.location.origin),
   method: 'patch',
@@ -55,20 +76,22 @@ const [ ok, data ] = await rdb.Fetch.postJson({
   transform: mapTask,
 })
 
+// higher order concept that allows for metadata and statefull control
+// `record.state` = `{ isProcessing, failReason, record, envelope }`
 const record = new rdb.Record({
   url: '/tasks',
   params: { page: 2 },
-  payloadMapper (payload) {
+  payloadMapper (value) {
     return rdb.record((value) => ({
       page: rdb.property(value, 'page', rdb.integer),
       total: rdb.property(value, 'total', rdb.integer),
       list: rdb.property(value, 'list', rdb.list(mapTask)),
-    })
+    })(value)
   },
 })
-await record.read
+await record.read // afterwards `state.isProcessing =  false`
 console.log(record.state.record) // prints: { page: 2, total: 42, list: [ { id: 1, ...}, ... ] }
 // expected server response is JSON:
 // { header: { <optional-meta-data> }, payload: { page: 2, total: 42, list: [ ... ], failReason: undefined }
-// where both header and failReason are optional - servers as meta-data
+// where both header and failReason are optional metadata
 ```
